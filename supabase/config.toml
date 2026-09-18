@@ -1,0 +1,12 @@
+project_id = "simi-learn-mobile"
+
+[functions.generate-lesson]
+verify_jwt = true
+
+[functions.lesson-feedback]
+verify_jwt = true
+
+# RevenueCat cannot send a Supabase JWT. This endpoint independently requires
+# REVENUECAT_WEBHOOK_AUTH_TOKEN and rejects requests without an exact match.
+[functions.revenuecat-webhook]
+verify_jwt = false

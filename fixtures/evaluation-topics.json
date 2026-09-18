@@ -1,0 +1,22 @@
+[
+  {"domain":"mathematics","topic":"Why does multiplying two negative numbers give a positive?","level":"middle-school"},
+  {"domain":"mathematics","topic":"How does the derivative represent instantaneous change?","level":"high-school"},
+  {"domain":"mathematics","topic":"Why does the area formula for a circle contain pi?","level":"middle-school"},
+  {"domain":"mathematics","topic":"Explain Bayes' theorem with a medical-test example","level":"college"},
+  {"domain":"science","topic":"Why do planets orbit the Sun?","level":"middle-school"},
+  {"domain":"science","topic":"How does photosynthesis store energy?","level":"middle-school"},
+  {"domain":"science","topic":"How does natural selection change a population?","level":"high-school"},
+  {"domain":"science","topic":"Why does time dilation occur in special relativity?","level":"college"},
+  {"domain":"science","topic":"How does an mRNA vaccine train the immune system?","level":"high-school"},
+  {"domain":"science","topic":"Why does increasing resistance reduce current?","level":"high-school"},
+  {"domain":"history","topic":"How did the printing press change European society?","level":"middle-school"},
+  {"domain":"history","topic":"What chain of events started the First World War?","level":"high-school"},
+  {"domain":"history","topic":"How did the Green Revolution change food production in India?","level":"high-school"},
+  {"domain":"history","topic":"How did maritime trade shape the Chola Empire?","level":"middle-school"},
+  {"domain":"economics","topic":"Why does inflation reduce purchasing power?","level":"middle-school"},
+  {"domain":"economics","topic":"How do interest rates affect borrowing and inflation?","level":"high-school"},
+  {"domain":"economics","topic":"What causes a negative externality?","level":"college"},
+  {"domain":"programming","topic":"Explain recursion using the call stack","level":"high-school"},
+  {"domain":"programming","topic":"How does a hash table find a value quickly?","level":"college"},
+  {"domain":"programming","topic":"What happens during an asynchronous JavaScript request?","level":"college"}
+]

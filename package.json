@@ -1,0 +1,20 @@
+{
+  "name": "simi-learn-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "start": "npm --workspace @simi/mobile run start",
+    "android": "npm --workspace @simi/mobile run android",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "validate": "npm run typecheck && npm run test"
+  },
+  "engines": {
+    "node": ">=20.18.0"
+  }
+}
+
