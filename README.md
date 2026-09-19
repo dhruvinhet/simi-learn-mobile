@@ -34,7 +34,7 @@ This repository is the public Shipaton 2026 mobile project. It is technically an
 ```powershell
 cd simi-learn-mobile
 npm install
-Copy-Item .env.example .env
+Copy-Item apps\mobile\.env.example apps\mobile\.env
 npm run typecheck
 npm test
 npm run start
@@ -80,7 +80,7 @@ Create a separate OneSignal app for `com.simi.visuallearn` and set `EXPO_PUBLIC_
 
 Every accepted lesson has three to five scenes, exactly two questions, bounded coordinates, two to twelve teaching elements per scene, valid semantic IDs, valid animation targets, and explicit narration-to-visual references. Known conceptual misconceptions are rejected. A generation error is intentionally preferred over a misleading visual fallback.
 
-See [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) for the complete release gate and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for data flow and security boundaries.
+See [docs/EXTERNAL_SETUP.md](docs/EXTERNAL_SETUP.md) for the dashboard-by-dashboard cloud and store setup, [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) for the release gate, and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for data flow and security boundaries.
 
 ## License
 

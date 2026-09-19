@@ -1,5 +1,7 @@
 import type { ExpoConfig } from "expo/config";
 
+const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID?.trim();
+
 const config: ExpoConfig = {
   name: "Simi Learn",
   slug: "simi-learn",
@@ -25,10 +27,7 @@ const config: ExpoConfig = {
   plugins: [["onesignal-expo-plugin", { mode: process.env.EXPO_PUBLIC_ONESIGNAL_MODE === "production" ? "production" : "development" }], "expo-router", "expo-dev-client"],
   experiments: { typedRoutes: true },
   runtimeVersion: { policy: "fingerprint" },
-  extra: {
-    eas: { projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID ?? "replace-with-eas-project-id" },
-  },
+  extra: easProjectId ? { eas: { projectId: easProjectId } } : {},
 };
 
 export default config;
-
