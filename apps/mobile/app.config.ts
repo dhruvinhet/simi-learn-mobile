@@ -22,7 +22,7 @@ const config: ExpoConfig = {
     },
     permissions: ["com.samsung.android.iap.permission.BILLING"],
   },
-  plugins: ["expo-router", "expo-dev-client"],
+  plugins: [["onesignal-expo-plugin", { mode: process.env.EXPO_PUBLIC_ONESIGNAL_MODE === "production" ? "production" : "development" }], "expo-router", "expo-dev-client"],
   experiments: { typedRoutes: true },
   runtimeVersion: { policy: "fingerprint" },
   extra: {

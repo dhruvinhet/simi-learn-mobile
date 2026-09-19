@@ -1,22 +1,39 @@
 {
-  "cli": { "version": ">= 16.17.0", "appVersionSource": "remote" },
+  "cli": {
+    "version": ">= 16.17.0",
+    "appVersionSource": "remote"
+  },
   "build": {
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "android": { "buildType": "apk" },
-      "env": { "EXPO_PUBLIC_GALAXY_BILLING_MODE": "TEST" }
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_GALAXY_BILLING_MODE": "TEST",
+        "EXPO_PUBLIC_ONESIGNAL_MODE": "development"
+      }
     },
     "preview": {
       "distribution": "internal",
-      "android": { "buildType": "apk" },
-      "env": { "EXPO_PUBLIC_GALAXY_BILLING_MODE": "TEST" }
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_GALAXY_BILLING_MODE": "TEST",
+        "EXPO_PUBLIC_ONESIGNAL_MODE": "development"
+      }
     },
     "production": {
       "autoIncrement": true,
-      "android": { "buildType": "app-bundle" },
-      "env": { "EXPO_PUBLIC_GALAXY_BILLING_MODE": "PRODUCTION" }
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_GALAXY_BILLING_MODE": "PRODUCTION",
+        "EXPO_PUBLIC_ONESIGNAL_MODE": "production"
+      }
     }
   }
 }
-

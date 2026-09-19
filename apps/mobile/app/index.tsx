@@ -6,6 +6,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Body, Button, Card, Screen, Title } from "../src/components/Primitives";
 import { generateLesson } from "../src/services/lessonApi";
+import { requestStudyReminders } from "../src/services/notifications";
 import { toAppError } from "../src/services/errors";
 import { getGuestUsage, incrementGuestUsage } from "../src/services/storage";
 import { useApp } from "../src/state/AppContext";
@@ -32,6 +33,11 @@ export default function Home() {
   const [status, setStatus] = useState("Planning a clear visual story...");
 
   const examples = useMemo(() => ["Why does inflation happen?", "How does photosynthesis store energy?", "Explain recursion visually"], []);
+
+  const enableReminders = async () => {
+    const result = await requestStudyReminders();
+    Alert.alert(result === "enabled" ? "Study reminders enabled" : result === "denied" ? "Notifications remain off" : "Reminders are not configured", result === "enabled" ? "Simi can send useful recall prompts after lessons." : result === "denied" ? "You can enable notifications later in Galaxy device settings." : "Add the OneSignal App ID to a development build first.");
+  };
 
   const createLesson = async () => {
     const trimmed = topic.trim();
@@ -125,6 +131,7 @@ export default function Home() {
               <View style={styles.durationRow}>{[0.8, 1, 1.2].map((rate) => <Pressable key={rate} onPress={() => app.updateSettings({ ...app.settings, speechRate: rate })} style={[styles.duration, app.settings.speechRate === rate && styles.durationActive]}><Text style={styles.durationText}>{rate}×</Text></Pressable>)}</View>
             </Card>
             <Card><Text style={styles.lessonTitle}>{app.isPro ? "Student Pro active" : "Free plan"}</Text><Body muted>{app.isPro ? "Up to 30 generated lessons per billing period." : "Three complete lessons are included."}</Body><Button label={app.isPro ? "Manage membership" : "View Student Pro"} variant="secondary" onPress={() => router.push("/paywall")} /></Card>
+            <Card><Text style={styles.lessonTitle}>Spaced recall</Text><Body muted>Enable one useful reminder to revisit a lesson or finish its quiz.</Body><Button label="Enable study reminders" variant="secondary" onPress={() => { void enableReminders(); }} /></Card>
           </>
         )}
       </ScrollView>

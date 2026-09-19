@@ -23,6 +23,7 @@ This repository is the public Shipaton 2026 mobile project. It is technically an
 
 - Node.js 22.13 or newer
 - npm 10 or newer
+- JDK 17 for local Android builds (JDK 25 is incompatible with the current native Worklets toolchain)
 - Expo SDK 57 compatible Android toolchain
 - A physical Samsung Galaxy device for Galaxy Billing tests
 - Supabase CLI for backend deployment
@@ -70,6 +71,10 @@ Generation and feedback require a valid Supabase member or anonymous JWT. The Re
 Create a Galaxy RevenueCat app, entitlement `pro`, offering, and monthly product `simi_student_monthly`. Use a Galaxy public SDK key in the Expo environment.
 
 Development and preview builds use `GALAXY_BILLING_MODE.TEST`. Production builds use `PRODUCTION`. Verify purchases only on a physical Galaxy device signed into a Samsung account.
+
+## Spaced-recall notifications
+
+Create a separate OneSignal app for `com.simi.visuallearn` and set `EXPO_PUBLIC_ONESIGNAL_APP_ID`. The app explains the benefit before asking for notification permission, schedules lesson-specific recall prompts only after opt-in, and deep-links back to the saved lesson. Development builds use OneSignal development mode; EAS production builds switch to production mode.
 
 ## Quality contract
 

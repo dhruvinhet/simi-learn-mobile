@@ -1,6 +1,7 @@
 import type { Lesson } from "@simi/lesson-schema";
 import { createContext, type PropsWithChildren, useContext, useEffect, useMemo, useState } from "react";
 import { configurePurchases } from "../services/purchases";
+import { initializeNotifications } from "../services/notifications";
 import { ensureAuthenticatedUser } from "../services/supabase";
 import { loadLessons, loadSettings, type AppSettings, removeLesson, saveLesson, saveSettings as persistSettings } from "../services/storage";
 
@@ -34,6 +35,7 @@ export function AppProvider({ children }: PropsWithChildren) {
       try {
         const [storedLessons, storedSettings, user] = await Promise.all([loadLessons(), loadSettings(), ensureAuthenticatedUser()]);
         const purchaseState = await configurePurchases(user?.id);
+        if (user) await initializeNotifications(user.id);
         if (!mounted) return;
         setLessons(storedLessons);
         setSettings(storedSettings);
