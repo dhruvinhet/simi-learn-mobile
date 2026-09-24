@@ -24,6 +24,21 @@ The result must show one device with status `device`. If it says `unauthorized`,
 
 ## Install and run the development app
 
+### Fast path with the APK already built on this PC
+
+Once `adb devices` shows your phone, use the arm64 debug APK that was verified locally:
+
+```powershell
+cd 'F:\simi-learn-mobile'
+adb install -r 'F:\simi-learn-mobile\apps\mobile\android\app\build\outputs\apk\debug\app-debug.apk'
+adb reverse tcp:8081 tcp:8081
+cd apps\mobile
+npx expo start --dev-client --localhost
+```
+
+Keep Metro open. Press `a` in its terminal or open **Simi Learn** on the phone and select the local server. This debug APK needs Metro; it is not a standalone store release.
+
+### Rebuild when native configuration changes
 Open PowerShell in a new window:
 
 ```powershell
