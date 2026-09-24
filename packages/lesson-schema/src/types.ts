@@ -1,6 +1,5 @@
 export const ELEMENT_TYPES = [
-  "text", "line", "arrow", "circle", "rect", "path", "icon", "group",
-  "chart", "timeline", "comparison", "callout", "highlight",
+  "text", "line", "arrow", "circle", "rect", "path",
 ] as const;
 
 export type ElementType = (typeof ELEMENT_TYPES)[number];
@@ -18,8 +17,6 @@ export type VisualElement = {
   color?: string;
   fill?: string;
   points?: number[];
-  icon?: "sun" | "planet" | "book" | "lightbulb" | "atom" | "code" | "person" | "check";
-  children?: VisualElement[];
 };
 
 export type SceneAnimation = {

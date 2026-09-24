@@ -1,9 +1,9 @@
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Body, Button, Card, Screen, Title } from "../src/components/Primitives";
-import { purchasePro, restorePro } from "../src/services/purchases";
+import { getProPrice, purchasePro, restorePro } from "../src/services/purchases";
 import { toAppError } from "../src/services/errors";
 import { useApp } from "../src/state/AppContext";
 import { colors, spacing } from "../src/theme";
@@ -12,6 +12,8 @@ export default function PaywallScreen() {
   const insets = useSafeAreaInsets();
   const app = useApp();
   const [busy, setBusy] = useState(false);
+  const [price, setPrice] = useState<string | null>(null);
+  useEffect(() => { if (app.purchasesConfigured) void getProPrice().then(setPrice); }, [app.purchasesConfigured]);
 
   const purchase = async () => {
     setBusy(true);
@@ -45,8 +47,8 @@ export default function PaywallScreen() {
         <Title>Keep learning visually.</Title>
         <Body muted>More hard ideas, the same careful visual and factual checks.</Body>
         <Card style={styles.offer}>
-          <Text style={styles.price}>₹199<Text style={styles.period}> / month</Text></Text>
-          <Body muted>Regional equivalent shown by Galaxy Store before purchase.</Body>
+          <Text style={styles.price}>{price ?? "Student Pro"}{price && <Text style={styles.period}> / month</Text>}</Text>
+          <Body muted>{price ? "Price supplied by Galaxy Store for this account." : "Galaxy Store will show the regional price before purchase."}</Body>
           {["30 generated lessons per billing period", "Offline replay of saved lessons", "Narration, captions and comprehension checks", "Cancel through Galaxy Store"].map((benefit) => <View key={benefit} style={styles.benefit}><Text style={styles.check}>✓</Text><Body style={styles.benefitCopy}>{benefit}</Body></View>)}
           <Button label="Start Student Pro" loading={busy} disabled={!app.purchasesConfigured} onPress={purchase} />
           {!app.purchasesConfigured && <Body muted style={styles.note}>Purchases become available in the configured Galaxy development build.</Body>}

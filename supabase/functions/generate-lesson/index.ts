@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 import { corsHeaders, json } from "../_shared/http.ts";
-import { systemPrompt, validateLesson, type Issue } from "../_shared/lesson.ts";
+import { fitDirectionalGeometry, systemPrompt, validateLesson, type Issue } from "../_shared/lesson.ts";
 
 type RequestBody = { topic: string; audienceLevel: "middle-school" | "high-school" | "college"; durationSeconds: 45 | 60 | 90; locale: string; requestId: string };
 const REQUEST_ID = /^[a-z0-9-]{8,80}$/i;
@@ -119,6 +119,7 @@ lessonId: ${body.requestId}
 createdAt: ${new Date().toISOString()}`;
 
     let lesson = await generateWithKeys(orderedKeys, [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }]);
+    lesson = fitDirectionalGeometry(lesson);
     let issues: Issue[] = validateLesson(lesson);
     if (issues.length) {
       lesson = await generateWithKeys(orderedKeys, [
@@ -128,6 +129,7 @@ createdAt: ${new Date().toISOString()}`;
 Validation failures: ${JSON.stringify(issues)}
 Candidate: ${JSON.stringify(lesson)}` },
       ]);
+      lesson = fitDirectionalGeometry(lesson);
       issues = validateLesson(lesson);
     }
     if (issues.length) {

@@ -2,7 +2,7 @@ import type { Lesson } from "@simi/lesson-schema";
 import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
 import { useEffect, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { Body, Button, ProgressBar } from "./Primitives";
 import { SceneCanvas } from "./SceneCanvas";
 import { colors, radii, spacing } from "../theme";
@@ -31,34 +31,39 @@ export function LessonPlayer({ lesson, settings, onComplete }: Props) {
     Speech.stop();
     if (!playing) return;
     let ended = false;
+    const startedAt = Date.now();
+    const advance = () => {
+      if (ended) return;
+      if (sceneIndex < lesson.scenes.length - 1) {
+        void Haptics.selectionAsync();
+        setSceneIndex((value) => value + 1);
+      } else {
+        setPlaying(false);
+        onComplete();
+      }
+    };
     Speech.speak(scene.narration, {
       language: lesson.locale,
       rate: settings.speechRate,
       onDone: () => {
         if (ended) return;
-        if (sceneIndex < lesson.scenes.length - 1) {
-          Haptics.selectionAsync();
-          setSceneIndex((value) => value + 1);
-        } else {
-          setPlaying(false);
-          onComplete();
-        }
+        if (timer.current) clearTimeout(timer.current);
+        const remaining = Math.max(0, scene.durationSeconds * 1000 - (Date.now() - startedAt));
+        timer.current = setTimeout(advance, remaining);
       },
       onError: () => {
-        timer.current = setTimeout(() => {
-          if (sceneIndex < lesson.scenes.length - 1) setSceneIndex((value) => value + 1);
-          else onComplete();
-        }, scene.durationSeconds * 1000);
+        if (ended) return;
+        if (timer.current) clearTimeout(timer.current);
+        setPlaying(false);
+        Alert.alert("Narration unavailable", "Check that text-to-speech is enabled on this device, then replay this scene.");
       },
     });
     timer.current = setTimeout(() => {
+      if (ended) return;
       Speech.stop();
-      if (sceneIndex < lesson.scenes.length - 1) setSceneIndex((value) => value + 1);
-      else {
-        setPlaying(false);
-        onComplete();
-      }
-    }, Math.max(10, scene.durationSeconds + 4) * 1000);
+      setPlaying(false);
+      Alert.alert("Narration took too long", "Replay this scene or use Next to continue.");
+    }, Math.max(30, scene.durationSeconds * 3) * 1000);
     return () => {
       ended = true;
       Speech.stop();
@@ -86,7 +91,7 @@ export function LessonPlayer({ lesson, settings, onComplete }: Props) {
       {settings.captions && <View style={styles.caption}><Text style={styles.captionText}>{scene.caption}</Text></View>}
       <View style={styles.controls}>
         <Button label="Previous" variant="secondary" disabled={sceneIndex === 0} onPress={() => goTo(sceneIndex - 1)} />
-        <Pressable accessibilityRole="button" accessibilityLabel={playing ? "Pause narration" : "Play narration"} onPress={toggle} style={styles.play}>
+        <Pressable accessibilityRole="button" accessibilityLabel={playing ? "Stop narration" : "Replay narration"} onPress={toggle} style={styles.play}>
           <Text style={styles.playText}>{playing ? "Ⅱ" : "▶"}</Text>
         </Pressable>
         <Button label="Next" variant="secondary" disabled={sceneIndex === lesson.scenes.length - 1} onPress={() => goTo(sceneIndex + 1)} />

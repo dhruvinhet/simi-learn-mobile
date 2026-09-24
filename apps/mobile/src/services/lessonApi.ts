@@ -8,7 +8,7 @@ import { ensureAuthenticatedUser, supabase } from "./supabase";
 export async function generateLesson(request: GenerateLessonRequest): Promise<Lesson> {
   if (config.fixtureMode) {
     await new Promise((resolve) => setTimeout(resolve, 700));
-    return { ...(fixture as unknown as Lesson), lessonId: request.requestId, topic: request.topic, audienceLevel: request.audienceLevel, locale: request.locale, createdAt: new Date().toISOString() };
+    return { ...(fixture as unknown as Lesson), lessonId: request.requestId, audienceLevel: request.audienceLevel, locale: request.locale, createdAt: new Date().toISOString() };
   }
   if (!supabase) throw new AppError("service", "Simi is not configured yet. Add the Supabase public values or enable fixture mode.");
   await ensureAuthenticatedUser();

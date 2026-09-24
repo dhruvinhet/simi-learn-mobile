@@ -31,17 +31,19 @@ function validateElement(element: unknown, path: string, ids: Set<string>, issue
   }
   for (const key of ["width", "height", "radius"] as const) {
     const value = element[key];
-    if (value !== undefined && (typeof value !== "number" || value < 0 || value > 100)) issues.push(issue(`${path}.${key}`, "size", `${key} must be between 0 and 100.`));
+    const directional = (element.type === "line" || element.type === "arrow") && key !== "radius";
+    if (value !== undefined && (typeof value !== "number" || !Number.isFinite(value) || value < (directional ? -100 : 0) || value > 100)) issues.push(issue(`${path}.${key}`, "size", "Element size is invalid."));
   }
   for (const key of ["color", "fill"] as const) {
     const value = element[key];
     if (value !== undefined && (typeof value !== "string" || !HEX.test(value))) issues.push(issue(`${path}.${key}`, "color", "Colors must use six-digit hex values."));
   }
   if (typeof element.text === "string" && element.text.length > 80) issues.push(issue(`${path}.text`, "text_length", "Visual text must be 80 characters or fewer."));
-  if (Array.isArray(element.children)) {
-    if (element.children.length > 6) issues.push(issue(`${path}.children`, "complexity", "Groups support at most six children."));
-    element.children.forEach((child, index) => validateElement(child, `${path}.children[${index}]`, ids, issues));
-  }
+  if (element.type === "text" && (typeof element.text !== "string" || !element.text.trim())) issues.push(issue(`${path}.text`, "missing_text", "Text elements need visible text."));
+  if (element.type === "circle" && (typeof element.radius !== "number" || element.radius <= 0 || (element.x as number) - element.radius < 0 || (element.x as number) + element.radius > 100 || (element.y as number) - element.radius < 0 || (element.y as number) + element.radius > 100)) issues.push(issue(`${path}.radius`, "geometry", "Circle must fit in the canvas."));
+  if (element.type === "rect" && (typeof element.width !== "number" || element.width <= 0 || typeof element.height !== "number" || element.height <= 0 || (element.x as number) + element.width > 100 || (element.y as number) + (element.height ?? 0) > 100 || (element.y as number) + (element.height ?? 0) < 0)) issues.push(issue(path, "geometry", "Rectangle must fit in the canvas."));
+  if ((element.type === "line" || element.type === "arrow") && (typeof element.width !== "number" || (element.height !== undefined && typeof element.height !== "number") || (element.x as number) + (element.type === "line" ? element.width : -element.width) < 0 || (element.x as number) + (element.type === "line" ? element.width : -element.width) > 100 || (element.y as number) + (element.height ?? 0) > 100 || (element.y as number) + (element.height ?? 0) < 0)) issues.push(issue(path, "geometry", "Line or arrow must fit in the canvas."));
+  if (element.type === "path" && (!Array.isArray(element.points) || element.points.length < 4 || element.points.length % 2 !== 0 || element.points.some((point: unknown) => typeof point !== "number" || point < 0 || point > 100))) issues.push(issue(`${path}.points`, "geometry", "Path needs visible, bounded point pairs."));
 }
 
 function validateScene(scene: unknown, index: number, issues: ValidationIssue[]): void {
@@ -102,7 +104,6 @@ export function visualElementIds(scene: LessonScene): Set<string> {
   const result = new Set<string>();
   const walk = (items: VisualElement[]) => items.forEach((item) => {
     result.add(item.id);
-    if (item.children) walk(item.children);
   });
   walk(scene.elements);
   return result;

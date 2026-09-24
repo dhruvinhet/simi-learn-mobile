@@ -34,6 +34,18 @@ export async function identifyPurchasesUser(appUserId: string): Promise<void> {
   await Purchases.logIn(appUserId);
 }
 
+export async function getProPrice(): Promise<string | null> {
+  if (!configured) return null;
+  try {
+    const Purchases = require("react-native-purchases").default;
+    const offerings = await Purchases.getOfferings();
+    const monthly = offerings.current?.monthly ?? offerings.current?.availablePackages?.[0];
+    return monthly?.product?.priceString ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function purchasePro(): Promise<boolean> {
   try {
     const Purchases = require("react-native-purchases").default;

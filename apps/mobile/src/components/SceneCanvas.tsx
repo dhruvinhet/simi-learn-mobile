@@ -30,7 +30,7 @@ function ElementShape({ item }: { item: VisualElement }) {
   const stroke = item.color ?? colors.cyan;
   const fill = item.fill ?? "transparent";
   if (item.type === "circle") return <Circle cx={sx(item.x)} cy={sy(item.y)} r={sx(item.radius ?? 5)} fill={fill} stroke={stroke} strokeWidth={item.color ? 5 : 0} />;
-  if (item.type === "rect" || item.type === "highlight" || item.type === "callout") return <Rect x={sx(item.x)} y={sy(item.y)} width={sx(item.width ?? 20)} height={sy(item.height ?? 12)} rx={18} fill={fill} stroke={stroke} strokeWidth={4} />;
+  if (item.type === "rect") return <Rect x={sx(item.x)} y={sy(item.y)} width={sx(item.width ?? 20)} height={sy(item.height ?? 12)} rx={18} fill={fill} stroke={stroke} strokeWidth={4} />;
   if (item.type === "line") return <Line x1={sx(item.x)} y1={sy(item.y)} x2={sx(item.x + (item.width ?? 20))} y2={sy(item.y + (item.height ?? 0))} stroke={stroke} strokeWidth={6} strokeLinecap="round" strokeDasharray="16 13" />;
   if (item.type === "arrow") return <Arrow item={item} />;
   if (item.type === "path" && item.points && item.points.length >= 4) {
@@ -38,9 +38,7 @@ function ElementShape({ item }: { item: VisualElement }) {
     const d = pairs.map(([x, y], index) => `${index === 0 ? "M" : "L"} ${sx(x!)} ${sy(y!)}`).join(" ");
     return <Path d={d} fill="none" stroke={stroke} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />;
   }
-  if (item.type === "text" || item.type === "icon") return <SvgText x={sx(item.x)} y={sy(item.y)} fill={stroke} fontSize={item.type === "icon" ? 52 : 34} fontWeight="700" textAnchor="start">{item.text ?? item.icon ?? ""}</SvgText>;
-  if (item.type === "group" && item.children) return <G>{item.children.map((child) => <ElementShape key={child.id} item={child} />)}</G>;
-  if (item.type === "chart" || item.type === "timeline" || item.type === "comparison") return <Rect x={sx(item.x)} y={sy(item.y)} width={sx(item.width ?? 30)} height={sy(item.height ?? 20)} rx={18} fill={fill || colors.panelRaised} stroke={stroke} strokeWidth={4} />;
+  if (item.type === "text") return <SvgText x={sx(item.x)} y={sy(item.y)} fill={stroke} fontSize={34} fontWeight="700" textAnchor="start">{item.text ?? ""}</SvgText>;
   return null;
 }
 

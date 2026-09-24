@@ -6,7 +6,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Body, Button, Card, Screen, Title } from "../src/components/Primitives";
 import { generateLesson } from "../src/services/lessonApi";
-import { requestStudyReminders } from "../src/services/notifications";
+import { config } from "../src/services/config";
 import { toAppError } from "../src/services/errors";
 import { getGuestUsage, incrementGuestUsage } from "../src/services/storage";
 import { useApp } from "../src/state/AppContext";
@@ -26,7 +26,7 @@ export default function Home() {
   const insets = useSafeAreaInsets();
   const app = useApp();
   const [tab, setTab] = useState<Tab>("learn");
-  const [topic, setTopic] = useState("");
+  const [topic, setTopic] = useState(config.fixtureMode ? "Why do planets orbit the Sun?" : "");
   const [level, setLevel] = useState<AudienceLevel>("middle-school");
   const [duration, setDuration] = useState<45 | 60 | 90>(60);
   const [loading, setLoading] = useState(false);
@@ -34,18 +34,13 @@ export default function Home() {
 
   const examples = useMemo(() => ["Why does inflation happen?", "How does photosynthesis store energy?", "Explain recursion visually"], []);
 
-  const enableReminders = async () => {
-    const result = await requestStudyReminders();
-    Alert.alert(result === "enabled" ? "Study reminders enabled" : result === "denied" ? "Notifications remain off" : "Reminders are not configured", result === "enabled" ? "Simi can send useful recall prompts after lessons." : result === "denied" ? "You can enable notifications later in Galaxy device settings." : "Add the OneSignal App ID to a development build first.");
-  };
-
   const createLesson = async () => {
     const trimmed = topic.trim();
     if (trimmed.length < 5) {
       Alert.alert("Add a little more detail", "Enter a topic or question with at least five characters.");
       return;
     }
-    if (!app.isPro && await getGuestUsage() >= 3) {
+    if (!config.fixtureMode && !app.isPro && await getGuestUsage() >= 3) {
       router.push("/paywall");
       return;
     }
@@ -56,7 +51,7 @@ export default function Home() {
     try {
       const lesson = await generateLesson(request);
       await app.addLesson(lesson);
-      if (!app.isPro) await incrementGuestUsage();
+      if (!config.fixtureMode && !app.isPro) await incrementGuestUsage();
       app.setActiveLesson(lesson);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.push("/lesson");
@@ -86,13 +81,15 @@ export default function Home() {
                 accessibilityLabel="Topic or question"
                 multiline
                 value={topic}
+                editable={!config.fixtureMode}
                 onChangeText={setTopic}
                 placeholder="e.g. Why do planets orbit the Sun?"
                 placeholderTextColor={colors.muted}
                 maxLength={240}
                 style={styles.input}
               />
-              <View style={styles.chips}>{examples.map((example) => <Pressable key={example} onPress={() => setTopic(example)} style={styles.example}><Text style={styles.exampleText}>{example}</Text></Pressable>)}</View>
+              {config.fixtureMode && <Body muted>Offline demo: this build plays the included orbit lesson. Turn off fixture mode to generate any topic.</Body>}
+              {!config.fixtureMode && <View style={styles.chips}>{examples.map((example) => <Pressable key={example} onPress={() => setTopic(example)} style={styles.example}><Text style={styles.exampleText}>{example}</Text></Pressable>)}</View>}
               <Text style={styles.label}>Explain it for</Text>
               <View style={styles.segment}>{levels.map((item) => <Pressable key={item.value} accessibilityRole="radio" accessibilityState={{ selected: level === item.value }} onPress={() => setLevel(item.value)} style={[styles.segmentItem, level === item.value && styles.segmentActive]}><Text style={[styles.segmentText, level === item.value && styles.segmentTextActive]}>{item.label}</Text></Pressable>)}</View>
               <Text style={styles.label}>Lesson length</Text>
@@ -131,7 +128,6 @@ export default function Home() {
               <View style={styles.durationRow}>{[0.8, 1, 1.2].map((rate) => <Pressable key={rate} onPress={() => app.updateSettings({ ...app.settings, speechRate: rate })} style={[styles.duration, app.settings.speechRate === rate && styles.durationActive]}><Text style={styles.durationText}>{rate}×</Text></Pressable>)}</View>
             </Card>
             <Card><Text style={styles.lessonTitle}>{app.isPro ? "Student Pro active" : "Free plan"}</Text><Body muted>{app.isPro ? "Up to 30 generated lessons per billing period." : "Three complete lessons are included."}</Body><Button label={app.isPro ? "Manage membership" : "View Student Pro"} variant="secondary" onPress={() => router.push("/paywall")} /></Card>
-            <Card><Text style={styles.lessonTitle}>Spaced recall</Text><Body muted>Enable one useful reminder to revisit a lesson or finish its quiz.</Body><Button label="Enable study reminders" variant="secondary" onPress={() => { void enableReminders(); }} /></Card>
           </>
         )}
       </ScrollView>

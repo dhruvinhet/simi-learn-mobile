@@ -74,13 +74,13 @@ Development and preview builds use `GALAXY_BILLING_MODE.TEST`. Production builds
 
 ## Spaced-recall notifications
 
-Create a separate OneSignal app for `com.simi.visuallearn` and set `EXPO_PUBLIC_ONESIGNAL_APP_ID`. The app explains the benefit before asking for notification permission, schedules lesson-specific recall prompts only after opt-in, and deep-links back to the saved lesson. Development builds use OneSignal development mode; EAS production builds switch to production mode.
+Create a separate OneSignal app for `com.simi.visuallearn` and set `EXPO_PUBLIC_ONESIGNAL_APP_ID`. The OneSignal SDK can identify the signed-in user, but lesson-specific campaigns, permission prompts, and deep links are not implemented yet. Do not claim the OneSignal prize category until a live campaign and navigation have been verified. Development builds use OneSignal development mode; EAS production builds switch to production mode.
 
 ## Quality contract
 
 Every accepted lesson has three to five scenes, exactly two questions, bounded coordinates, two to twelve teaching elements per scene, valid semantic IDs, valid animation targets, and explicit narration-to-visual references. Known conceptual misconceptions are rejected. A generation error is intentionally preferred over a misleading visual fallback.
 
-See [docs/EXTERNAL_SETUP.md](docs/EXTERNAL_SETUP.md) for the dashboard-by-dashboard cloud and store setup, [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) for the release gate, and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for data flow and security boundaries.
+See [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md) for exact Galaxy phone commands and known blockers, [docs/EXTERNAL_SETUP.md](docs/EXTERNAL_SETUP.md) for the dashboard-by-dashboard cloud and store setup, [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) for the release gate, and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for data flow and security boundaries.
 
 ## License
 

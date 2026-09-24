@@ -41,4 +41,12 @@ describe("validateLesson", () => {
     invalid.scenes[0]!.elements[0]!.x = 120;
     expect(validateLesson(invalid).ok).toBe(false);
   });
+  it("rejects visuals that cannot render a teaching shape", () => {
+    const invalid = structuredClone(lesson);
+    (invalid.scenes[0]!.elements[0]! as { type: string }).type = "chart";
+    expect(validateLesson(invalid).ok).toBe(false);
+    (invalid.scenes[0]!.elements[0]! as { type: string; radius?: number }).type = "circle";
+    Reflect.deleteProperty(invalid.scenes[0]!.elements[0]!, "radius");
+    expect(validateLesson(invalid).ok).toBe(false);
+  });
 });

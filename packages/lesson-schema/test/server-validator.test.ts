@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateLesson as validateServerLesson } from "../../../supabase/functions/_shared/lesson";
+import { fitDirectionalGeometry, validateLesson as validateServerLesson } from "../../../supabase/functions/_shared/lesson";
 
 const base = {
   schemaVersion: 1, lessonId: "lesson-test", title: "A test lesson", topic: "Test topic",
@@ -26,9 +26,31 @@ describe("Edge lesson quality gate", () => {
     lesson.scenes[0]!.narration = "An outward force balances gravity.";
     expect(validateServerLesson(lesson).some((value) => value.code === "conceptual_error")).toBe(true);
   });
-  it("rejects narration references that are not visible", () => {
+  it("normalizes common color syntax before native rendering", () => {
+    const lesson = structuredClone(base);
+    lesson.scenes[0]!.elements[0]!.fill = "#abc";
+    lesson.scenes[0]!.elements[1]!.fill = "orange";
+    fitDirectionalGeometry(lesson);
+    expect(lesson.scenes[0]!.elements[0]!.fill).toBe("#aabbcc");
+    expect(lesson.scenes[0]!.elements[1]!.fill).toBe("#ffa500");
+    expect(validateServerLesson(lesson)).toEqual([]);
+  });  it("fits an arrow endpoint inside the canvas without a fallback card", () => {
+    const lesson = structuredClone(base);
+    lesson.scenes[0]!.elements.push({ id: "direction-arrow", type: "arrow", x: 8, y: 50, width: 50, height: 0, fill: "#55DDE0" } as never);
+    const fitted = fitDirectionalGeometry(lesson) as typeof lesson;
+    expect((fitted.scenes[0]!.elements[2]! as unknown as { width: number }).width).toBe(8);
+    expect(validateServerLesson(fitted)).toEqual([]);
+  });  it("rejects narration references that are not visible", () => {
     const lesson = structuredClone(base);
     lesson.scenes[0]!.visualReferences = ["missing-object"];
     expect(validateServerLesson(lesson).some((value) => value.code === "alignment")).toBe(true);
+  });
+  it("rejects blank composite cards and missing primitive geometry", () => {
+    const lesson = structuredClone(base);
+    (lesson.scenes[0]!.elements[0]! as { type: string }).type = "chart";
+    expect(validateServerLesson(lesson).some((value) => value.code === "element_type")).toBe(true);
+    (lesson.scenes[0]!.elements[0]! as { type: string; radius?: number }).type = "circle";
+    Reflect.deleteProperty(lesson.scenes[0]!.elements[0]!, "radius");
+    expect(validateServerLesson(lesson).some((value) => value.code === "geometry")).toBe(true);
   });
 });

@@ -33,14 +33,21 @@ export function AppProvider({ children }: PropsWithChildren) {
     let mounted = true;
     void (async () => {
       try {
-        const [storedLessons, storedSettings, user] = await Promise.all([loadLessons(), loadSettings(), ensureAuthenticatedUser()]);
-        const purchaseState = await configurePurchases(user?.id);
-        if (user) await initializeNotifications(user.id);
+        const [lessonsResult, settingsResult, userResult] = await Promise.allSettled([
+          loadLessons(), loadSettings(), ensureAuthenticatedUser(),
+        ]);
         if (!mounted) return;
-        setLessons(storedLessons);
-        setSettings(storedSettings);
+        if (lessonsResult.status === "fulfilled") setLessons(lessonsResult.value);
+        if (settingsResult.status === "fulfilled") setSettings(settingsResult.value);
+        const user = userResult.status === "fulfilled" ? userResult.value : null;
+        if (userResult.status === "rejected") console.warn("Guest sign-in will retry when a lesson is requested.");
+        const purchaseState = await configurePurchases(user?.id);
+        if (user) void initializeNotifications(user.id).catch(() => console.warn("Notifications unavailable."));
+        if (!mounted) return;
         setPro(purchaseState.isPro);
         setPurchasesConfigured(purchaseState.configured);
+      } catch (error) {
+        console.warn("App startup could not finish:", error);
       } finally {
         if (mounted) setReady(true);
       }
