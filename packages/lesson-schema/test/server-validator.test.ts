@@ -7,7 +7,7 @@ const base = {
   summary: "A concrete explanation.", createdAt: "2026-09-19T00:00:00.000Z",
   scenes: Array.from({ length: 3 }, (_, index) => ({
     id: "scene-" + index, learningGoal: "Understand one relationship",
-    narration: "The blue circle moves toward the labelled center.",
+    narration: "The blue circle moves steadily toward the labelled center point. As it gets closer, the distance between them shrinks until the circle reaches the center and comes to a complete stop.",
     caption: "Direction changes toward the center.", durationSeconds: 15,
     visualReferences: ["circle-" + index, "center-" + index],
     elements: [
@@ -21,10 +21,30 @@ const base = {
 
 describe("Edge lesson quality gate", () => {
   it("accepts a valid teaching plan", () => expect(validateServerLesson(base)).toEqual([]));
+  it("rejects overlapping labeled concept boxes for targeted repair", () => {
+    const lesson = structuredClone(base);
+    lesson.scenes[0]!.elements.push(
+      { id: "step-one", type: "rect", x: 20, y: 20, width: 40, height: 30, text: "Step one" } as never,
+      { id: "step-two", type: "rect", x: 30, y: 30, width: 40, height: 30, text: "Step two" } as never,
+    );
+    expect(validateServerLesson(lesson).some((value) => value.code === "overlapping_concepts")).toBe(true);
+  });
+  it("rejects narration too long for its scene", () => {
+    const lesson = structuredClone(base);
+    lesson.scenes[0]!.narration = "The center changes the direction of the moving object. ".repeat(20);
+    expect(validateServerLesson(lesson).some((value) => value.code === "narration_too_long")).toBe(true);
+  });
   it("hard-rejects a known force misconception", () => {
     const lesson = structuredClone(base);
-    lesson.scenes[0]!.narration = "An outward force balances gravity.";
+    lesson.scenes[0]!.narration = "An outward force balances gravity and keeps the satellite in orbit. This centrifugal push exactly cancels the inward pull so the object floats at a fixed distance from the planet.";
     expect(validateServerLesson(lesson).some((value) => value.code === "conceptual_error")).toBe(true);
+  });
+  it("normalizes paired path coordinates before checking geometry", () => {
+    const lesson = structuredClone(base);
+    lesson.scenes[0]!.elements.push({ id: "curve", type: "path", x: 50, y: 50, points: [[0, 20], [50, 120], [100, 40]] } as never);
+    fitDirectionalGeometry(lesson);
+    expect((lesson.scenes[0]!.elements[2]! as unknown as { points: number[] }).points).toEqual([0, 20, 50, 100, 100, 40]);
+    expect(validateServerLesson(lesson)).toEqual([]);
   });
   it("normalizes common color syntax before native rendering", () => {
     const lesson = structuredClone(base);

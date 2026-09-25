@@ -40,6 +40,15 @@ export function fitDirectionalGeometry(input: unknown): unknown {
         if (normalized === undefined) delete element[key];
         else element[key] = normalized;
       }
+      if (element.type === "path" && Array.isArray(element.points)) {
+        const coordinates = element.points.flatMap((point: unknown) => {
+          if (Array.isArray(point) && point.length >= 2) return [point[0], point[1]];
+          if (object(point) && typeof point.x === "number" && typeof point.y === "number") return [point.x, point.y];
+          return [point];
+        });
+        if (coordinates.length >= 4 && coordinates.length % 2 === 0 && coordinates.every((value: unknown) => typeof value === "number" && Number.isFinite(value)))
+          element.points = coordinates.map((value: number) => Math.max(0, Math.min(100, value)));
+      }
       if (element.type !== "line" && element.type !== "arrow") continue;
       if (typeof element.x !== "number" || typeof element.y !== "number" || typeof element.width !== "number") continue;
       const tipX = element.x;
@@ -70,6 +79,13 @@ export function validateLesson(input: unknown): Issue[] {
         if (typeof scene[field] !== "string" || !(scene[field] as string).trim()) issues.push({ path: path + "." + field, code: "required", message: field + " is required." });
       }
       if (typeof scene.narration === "string" && scene.narration.length > 900) issues.push({ path: path + ".narration", code: "length", message: "Narration is too long." });
+      if (typeof scene.narration === "string" && typeof scene.durationSeconds === "number") {
+        const wordCount = scene.narration.trim().split(/\s+/).filter(Boolean).length;
+        const minWords = Math.floor(scene.durationSeconds * 1.5);
+        if (wordCount < minWords) issues.push({ path: path + ".narration", code: "narration_too_short", message: `Narration has ${wordCount} words but needs at least ${minWords} for a ${scene.durationSeconds}s scene (1.5 words/sec minimum).` });
+        const maxWords = Math.ceil(scene.durationSeconds * 2.7);
+        if (wordCount > maxWords) issues.push({ path: path + ".narration", code: "narration_too_long", message: `Narration has ${wordCount} words but needs at most ${maxWords} for a ${scene.durationSeconds}s scene.` });
+      }
       if (typeof scene.caption === "string" && scene.caption.length > 160) issues.push({ path: path + ".caption", code: "length", message: "Caption is too long." });
       if (typeof scene.durationSeconds !== "number" || scene.durationSeconds < 7 || scene.durationSeconds > 30) issues.push({ path: path + ".durationSeconds", code: "duration", message: "Duration must be 7 to 30 seconds." });
       const ids = new Set<string>();
@@ -92,6 +108,16 @@ export function validateLesson(input: unknown): Issue[] {
         if ((element.type === "line" || element.type === "arrow") && (typeof element.width !== "number" || (element.height !== undefined && typeof element.height !== "number") || (element.x as number) + (element.type === "line" ? element.width : -element.width) < 0 || (element.x as number) + (element.type === "line" ? element.width : -element.width) > 100 || (element.y as number) + (element.height ?? 0) > 100 || (element.y as number) + (element.height ?? 0) < 0)) issues.push({ path: ep, code: "geometry", message: "Line or arrow must fit in the canvas." });
         if (element.type === "path" && (!Array.isArray(element.points) || element.points.length < 4 || element.points.length % 2 !== 0 || element.points.some((point: unknown) => typeof point !== "number" || point < 0 || point > 100))) issues.push({ path: ep + ".points", code: "geometry", message: "Path needs visible, bounded point pairs." });
       });
+      const boxes = Array.isArray(scene.elements) ? (scene.elements as unknown[]).filter((element): element is Record<string, unknown> => object(element) && element.type === "rect" && typeof element.text === "string" && Boolean(element.text.trim())) : [];
+      for (let first = 0; first < boxes.length; first++) for (let second = first + 1; second < boxes.length; second++) {
+        const a = boxes[first]!, b = boxes[second]!;
+        if (![a.x, a.y, a.width, a.height, b.x, b.y, b.width, b.height].every((value) => typeof value === "number" && Number.isFinite(value))) continue;
+        const overlapWidth = Math.max(0, Math.min((a.x as number) + (a.width as number), (b.x as number) + (b.width as number)) - Math.max(a.x as number, b.x as number));
+        const overlapHeight = Math.max(0, Math.min((a.y as number) + (a.height as number), (b.y as number) + (b.height as number)) - Math.max(a.y as number, b.y as number));
+        const smallerArea = Math.min((a.width as number) * (a.height as number), (b.width as number) * (b.height as number));
+        if (smallerArea > 0 && overlapWidth * overlapHeight / smallerArea > 0.12)
+          issues.push({ path: path + ".elements", code: "overlapping_concepts", message: "Labeled concept boxes overlap. Separate them into a readable flow." });
+      }
       if (!Array.isArray(scene.visualReferences) || scene.visualReferences.length < 1) issues.push({ path: path + ".visualReferences", code: "alignment", message: "List the visible ids explained by the narration." });
       else scene.visualReferences.forEach((reference, index) => {
         if (typeof reference !== "string" || !ids.has(reference)) issues.push({ path: `${path}.visualReferences[${index}]`, code: "alignment", message: "Narration references must resolve to visible ids." });
@@ -121,33 +147,3 @@ export function validateLesson(input: unknown): Issue[] {
   if (misconceptions.some((pattern) => pattern.test(raw))) issues.push({ path: "$", code: "conceptual_error", message: "The explanation contains a known conceptual misconception." });
   return issues;
 }
-
-export const systemPrompt = `You are the lesson director for Simi Learn. Return only one JSON object.
-Create a short, factually accurate visual lesson for the requested student level.
-
-HARD CONTRACT
-- schemaVersion is 1. Use exactly 3-5 scenes and exactly 2 quiz questions.
-- The scene durations must add to estimatedSeconds (within 3 seconds).
-- Each scene teaches one relationship, uses 2-12 visible elements, and has a distinct composition.
-- Coordinate system is 0-100. Keep visuals inside the canvas. Use six-digit hex colors. For line, the endpoint is (x+width,y+height); for arrow, the tip is (x,y) and tail is (x-width,y+height). Signed width and height are allowed for lines and arrows; keep both endpoints in the canvas.
-- Allowed element types: text,line,arrow,circle,rect,path. Compose comparisons, timelines, charts and causal flows from these visible primitives.
-- Every element has a unique semantic kebab-case id. visualReferences lists the exact ids that the narration explains.
-- Every animation targetId names an element in that same scene.
-- Allowed animation kinds: fade,draw,pulse,move,highlight. startMs >= 0; durationMs is 100-10000.
-- Visual text is at most 80 characters; captions are at most 160 characters.
-- Use concrete diagrams, comparisons, timelines, charts or causal flows made of labeled primitives. Never use generic title cards or empty containers.
-- Narration must describe what the student can see and must not mention absent objects.
-- Never invent a balancing outward force. Inertia is not a force. Use scientifically precise causal language.
-- Avoid decorative elements that do not teach.
-- Quiz choices contain four strings and correctIndex is 0-3.
-
-Element shape:
-{id,type,x,y,width?,height?,radius?,text?,color?,fill?,points?}
-Scene shape:
-{id,learningGoal,narration,caption,durationSeconds,elements,animations,visualReferences}
-Animation shape:
-{targetId,kind,startMs,durationMs,fromX?,fromY?}
-Lesson shape:
-{schemaVersion,lessonId,title,topic,audienceLevel,locale,estimatedSeconds,summary,scenes,quiz,createdAt}
-Quiz shape:
-{id,question,choices,correctIndex,explanation}`;
