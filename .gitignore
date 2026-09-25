@@ -1,10 +1,22 @@
+# Environment and secrets
+.env
+.env.*
+.env*.local
+!.env.example
+!apps/mobile/.env.example
+!supabase/.env.example
+!video-worker/.env.example
+
+# Node / Expo
 node_modules/
 .expo/
 dist/
 coverage/
-.env
-.env.*
-!.env.example
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Native build artifacts and keys
 apps/mobile/android/
 apps/mobile/ios/
 *.jks
@@ -12,6 +24,31 @@ apps/mobile/ios/
 *.mobileprovision
 *.p8
 *.p12
+
+# Supabase
 supabase/.branches/
 supabase/.temp/
+
+# Python & video worker artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+video-worker/output/
+video-worker/voices/
+*.mp4
+*.wav
+*.onnx
+
+# System & IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# ArchitectIQ graph cache
+.architectiq/
 
