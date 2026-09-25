@@ -1,76 +1,34 @@
-# Run Simi Learn on a Galaxy phone
+# Run Simi Learn on the Galaxy
 
-This is the separate mobile project at `F:\simi-learn-mobile`. The older web app stays in its own folder and does not need to run.
+The mobile repository is `F:\simi-learn-mobile`. The deployed web app is separate and does not need to run.
 
-## Before you connect the phone
+1. Keep **Anonymous Sign-Ins** enabled in the separate mobile Supabase project.
+2. Confirm `adb devices` shows `RZCW4141SHX device`.
+3. Run `.\dev-start.ps1` from `F:\simi-learn-mobile` after connecting the phone. It checks the worker health and restores the USB tunnels. To restore tunnels automatically after USB reconnects, keep `.\dev-tunnel-watch.ps1` running in a separate PowerShell window. The manual worker commands below are for troubleshooting only. In PowerShell window 1, run:
+   ```powershell
+   cd F:\simi-learn-mobile
+   $env:SIMI_LOCAL_DEMO='1'
+   $env:SIMI_PIPER_MODEL=(Resolve-Path 'video-worker/voices/en_US-kristin-medium.onnx').Path
+   python video-worker/app.py
+   ```
+   This offline-speech worker must remain open. If the local model is absent, run `python -m piper.download_voices --data-dir video-worker/voices en_US-kristin-medium` first.
+4. In window 2, run:
+   ```powershell
+   cd F:\simi-learn-mobile
+   adb reverse tcp:8787 tcp:8787
+   adb reverse tcp:8081 tcp:8081
+   adb install -r apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+   cd apps/mobile
+   npx expo start --dev-client --localhost
+   ```
+5. Launch Simi Learn on the phone. If it does not connect automatically, run:
+   ```powershell
+   adb shell am start -a android.intent.action.VIEW -d 'exp+simi-learn://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081' com.simi.visuallearn
+   ```
+6. Enter a topic and tap **Create my video**. Wait for the finished MP4, watch it without scene controls, tap **Download or share MP4**, then replay it offline from **Library**.
 
-1. In Supabase, open the **simi-learn-mobile** project, then **Authentication → Providers → Anonymous Sign-Ins**. Keep it enabled. Guest sign-in is required for live lesson generation.
-2. The file `apps\mobile\.env` already has this project's Supabase public URL and key. Do not paste Groq keys into it. The backend Groq keys belong only in Supabase secrets.
-3. RevenueCat, OneSignal, and EAS values in that file are still placeholders. Live lessons can be tested without them. Purchases, push notifications, and cloud builds cannot be accepted as complete until those services are configured and tested.
-4. Install a Samsung Galaxy device's Android USB driver if Windows does not recognize the phone. Use a data-capable USB cable.
+The public build variable `EXPO_PUBLIC_VIDEO_WORKER_URL` is `http://127.0.0.1:8787` for this USB test. Production needs the worker's HTTPS URL. The `SIMI_LOCAL_DEMO` bypass is loopback-only and must never be set on a public host.
 
-## Enable USB debugging
+For a native rebuild, set `JAVA_HOME=C:\Program Files\Microsoft\jdk-17.0.20.101-hotspot`, then run `cd apps/mobile/android; .\gradlew.bat app:assembleDebug --no-daemon`. The development APK needs Metro; it is not a standalone store build.
 
-On the Galaxy phone, open **Settings → About phone → Software information**. Tap **Build number** seven times and unlock the phone if prompted. Return to **Settings → Developer options**, turn on **USB debugging**, connect the USB cable, and accept the phone's **Allow USB debugging?** prompt. Keep the phone unlocked during installation.
-
-In PowerShell:
-
-```powershell
-cd 'F:\simi-learn-mobile'
-adb devices
-```
-
-The result must show one device with status `device`. If it says `unauthorized`, accept the prompt on the phone and run the command again. If it shows no device, change the cable or USB mode and confirm the Samsung driver.
-
-## Install and run the development app
-
-### Fast path with the APK already built on this PC
-
-Once `adb devices` shows your phone, use the arm64 debug APK that was verified locally:
-
-```powershell
-cd 'F:\simi-learn-mobile'
-adb install -r 'F:\simi-learn-mobile\apps\mobile\android\app\build\outputs\apk\debug\app-debug.apk'
-adb reverse tcp:8081 tcp:8081
-cd apps\mobile
-npx expo start --dev-client --localhost
-```
-
-Keep Metro open. Press `a` in its terminal or open **Simi Learn** on the phone and select the local server. This debug APK needs Metro; it is not a standalone store release.
-
-### Rebuild when native configuration changes
-Open PowerShell in a new window:
-
-```powershell
-cd 'F:\simi-learn-mobile'
-$env:JAVA_HOME = 'C:\Program Files\Microsoft\jdk-17.0.20.101-hotspot'
-$env:ANDROID_HOME = 'C:\Users\dhruv\AppData\Local\Android\Sdk'
-npm install
-npm run validate
-cd apps\mobile
-npx expo run:android --device
-```
-
-Choose the Galaxy device if Expo asks. The first native build can take several minutes. Expo installs the debug app and starts Metro. Keep that terminal open while testing. If the app opens but cannot reach Metro, run `adb reverse tcp:8081 tcp:8081` in a second PowerShell window, then reload the app. If Expo says port 8081 is already busy, stop the older Metro terminal and rerun the command.
-
-For later sessions, you normally do not need another native build. From `F:\simi-learn-mobile\apps\mobile`, run `npx expo start --dev-client`, then open **Simi Learn** on the phone. Rebuild with `npx expo run:android --device` after changing native packages, Expo config, or environment values embedded in the app.
-
-## Manual learning check
-
-1. On **Learn**, tap **Why does inflation happen?**, leave **Middle school** and **60s**, then tap **Create visual lesson**.
-2. Confirm that a lesson with three to five actual teaching diagrams opens. Watch every scene and listen for narration that matches the visible elements.
-3. Use **Previous**, **Next**, and the narration control. On Android, stopping speech and replaying restarts the current scene's narration because Expo Speech does not support native pause/resume on Android.
-4. Finish the two-question check, return to **Library**, and replay the lesson.
-5. Turn off Wi-Fi/mobile data and replay that saved lesson. Generation itself still requires a connection.
-6. Repeat with a science, mathematics, history, economics, and programming topic. If a lesson fails the quality gate, record its topic, elapsed time, and the error shown. No generic card should be substituted.
-
-## Offline UI demonstration
-
-If Supabase or Groq is unavailable and you only need to inspect the interface, set `EXPO_PUBLIC_USE_FIXTURES=true` in `apps\mobile\.env`, then rebuild or restart Metro. The app clearly labels this as an orbit-only demonstration; it does not generate arbitrary topics. Set it back to `false` for the live test and final submission.
-
-## Current release blockers
-
-- No physical Android device was connected during the automated checks, so install, narration, touch behavior, offline replay, and purchase flows still require manual testing.
-- Galaxy RevenueCat key and product configuration are not set. Do not claim a working purchase flow or submit a store build until a physical Galaxy purchase, restore, cancellation, and entitlement expiration test passes.
-- OneSignal and EAS project IDs are not set. These are optional for a local Next Gen demo; do not claim the OneSignal category.
-- The quality and performance gates in `docs\RELEASE_CHECKLIST.md` still need the full topic corpus and device runs.
+RevenueCat, OneSignal and EAS IDs remain unconfigured. A Galaxy purchase/restore test and full cross-topic visual review remain required before any store claim.

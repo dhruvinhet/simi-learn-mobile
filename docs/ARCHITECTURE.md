@@ -1,44 +1,13 @@
 # Architecture
 
-## Isolation
+The mobile project is a separate repository, package, Supabase project and render service. The existing web app is never called or changed.
 
-The mobile system does not import, call, deploy, or share secrets with the existing web application.
+1. The Expo app signs in as a guest or member and requests one validated lesson plan from the Supabase Edge Function.
+2. The function checks quota, uses Groq to produce three to five teaching scenes, performs deterministic checks and at most one targeted repair, then stores the plan.
+3. The app asks the isolated Python video worker to render the lesson. The worker verifies the Supabase JWT, fetches the canonical completed plan from the mobile project's database with the owner's ID, and limits concurrent encodes.
+4. The worker uses offline text-to-speech and FFmpeg to make one H.264/AAC MP4. Frames contain the lesson's actual visual elements, timed reveals, semantic colors, narration and captions.
+5. The app downloads the finished MP4 into its document directory, plays it continuously with native controls, and offers system download/share. The saved file replays offline. The two-question check is available after playback.
 
-| Boundary | Mobile value |
-|---|---|
-| Package ID | `com.simi.visuallearn` |
-| Source | Standalone Git repository |
-| Backend | Separate Supabase project |
-| AI credentials | Separate Groq organization keys |
-| Billing | Separate RevenueCat project and Galaxy app |
-| Rendering | React Native SVG on-device |
-| Narration | Device text-to-speech |
-| Storage | AsyncStorage locally; validated plans in Supabase |
+Server secrets stay on the Edge Function and worker. Production worker hosting requires HTTPS and a persistent video directory. The debug phone can reach a localhost worker through `adb reverse tcp:8787 tcp:8787`.
 
-## Lesson flow
-
-1. The app establishes a Supabase anonymous or member session.
-2. It sends one idempotent request containing topic, level, duration, locale and request ID.
-3. The Edge Function checks the stored response and account quota.
-4. A single Groq request creates the complete three-to-five-scene plan.
-5. Deterministic checks validate structure, geometry, animation references, visual references and known misconceptions.
-6. One targeted repair is allowed. A second failure returns HTTP 422.
-7. The validated plan is stored and returned.
-8. The app stores it locally before opening the player.
-9. Playback has no backend dependency, so later scenes cannot buffer or arrive out of order.
-
-## Security
-
-- Groq and Supabase service-role keys exist only in Edge Function secrets.
-- Generation and feedback require valid Supabase JWTs, including for guests.
-- Database tables deny direct anon and authenticated access; only Edge Functions use the service role.
-- RevenueCat webhook traffic must match a separate high-entropy bearer secret.
-- Request IDs and RevenueCat event IDs make retries idempotent.
-- The app stores no school, age, contact list, camera data or sensitive educational records.
-- Prompt text is not stored; only a SHA-256 topic hash is retained for cache and abuse analysis.
-
-## Operational behavior
-
-A Groq 429 or transient server failure moves to the next configured organization key. Keys are ordered deterministically per request so concurrent traffic spreads without firing duplicate calls. Each attempt has a 25-second timeout. A completed request is returned from storage on retry.
-
-The service makes at most two planner calls: initial generation and one targeted repair. It never fans out by scene and never creates generic fallback visuals.
+The full MP4 is ready before playback, so there are no mid-video scene-loading gaps. This introduces an initial render wait; measure and optimize it on the target deployment. See [video-worker/README.md](../video-worker/README.md).

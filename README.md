@@ -1,6 +1,6 @@
 # Simi Learn — Visual Explanations
 
-Simi Learn turns a difficult topic into a short narrated visual lesson for students. It renders structured lessons natively on the phone, speaks narration on-device, checks understanding with two questions, and saves lessons for replay.
+Simi Learn turns a difficult topic into a short narrated visual lesson for students. It turns validated visual lessons into complete narrated MP4 videos, checks understanding with two questions, and saves videos for offline replay and download.
 
 This repository is the public Shipaton 2026 mobile project. It is technically and operationally isolated from the earlier Simi web application: it has its own package ID, Supabase project, RevenueCat project, credentials, deployment steps, and Git history.
 
@@ -9,10 +9,10 @@ This repository is the public Shipaton 2026 mobile project. It is technically an
 - Guest access backed by Supabase anonymous authentication
 - Optional email-link account sign-in
 - 45, 60, or 90 second lessons for three learner levels
-- Native SVG scene rendering and timed element reveals
-- On-device narration, captions, speed controls, reduced motion, replay and scene navigation
+- Separate Python/FFmpeg worker for continuous H.264/AAC MP4 output
+- Offline speech synthesis, captions, video playback and download/share
 - Two-question comprehension check
-- Local lesson library and offline replay
+- Local lesson library and offline MP4 replay
 - Three-lesson free allowance and Galaxy RevenueCat Student Pro entitlement
 - Idempotent Supabase Edge Function with organization-aware Groq key failover
 - Hard schema, layout, narration-reference and misconception gates
@@ -40,7 +40,7 @@ npm test
 npm run start
 ```
 
-For a no-cloud UI demonstration, set `EXPO_PUBLIC_USE_FIXTURES=true`. Fixture mode uses a validated orbit lesson and never sends a prompt.
+For a no-cloud UI demonstration, set `EXPO_PUBLIC_USE_FIXTURES=true`. Fixture mode uses a validated orbit lesson and never sends a prompt. The MP4 worker still needs to run; see [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md).
 
 RevenueCat and Galaxy Billing require a development build; Expo Go cannot load their native modules:
 
@@ -65,6 +65,10 @@ npx expo run:android
 6. Configure the RevenueCat webhook URL as `https://PROJECT.supabase.co/functions/v1/revenuecat-webhook` with `Authorization: Bearer YOUR_SECRET`.
 
 Generation and feedback require a valid Supabase member or anonymous JWT. The RevenueCat webhook cannot send a Supabase JWT, so it has a separate required bearer secret and idempotent event IDs.
+
+## Video worker
+
+Run the isolated offline-speech renderer in `video-worker/` locally, or deploy its Dockerfile behind HTTPS with persistent storage and server-only Supabase credentials. Set `EXPO_PUBLIC_VIDEO_WORKER_URL` in the mobile build. See [video-worker/README.md](video-worker/README.md).
 
 ## Galaxy Billing
 
