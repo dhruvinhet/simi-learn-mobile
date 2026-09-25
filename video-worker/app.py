@@ -22,6 +22,7 @@ from flask import Flask, abort, jsonify, request, send_file
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parent
+os.environ.setdefault("SIMI_LOCAL_DEMO", "1")
 OUTPUT = Path(os.environ.get("SIMI_VIDEO_DIR", str(ROOT / "output"))).resolve()
 OUTPUT.mkdir(parents=True, exist_ok=True)
 FFMPEG = os.environ.get("FFMPEG_BIN") or shutil.which("ffmpeg") or "ffmpeg"
@@ -39,8 +40,8 @@ render_slots = threading.BoundedSemaphore(2)
 app = Flask(__name__)
 
 # ── self-heal keyword sets ────────────────────────────────────────────────────
-_UP_WORDS   = {"upward", "rising", "ascending", "up", "toward-surface", "upwards", "rise", "ascend"}
-_DOWN_WORDS = {"downward", "falling", "descending", "down", "downwards", "fall", "descend", "sink"}
+_UP_WORDS   = {"upward", "rising", "ascending", "up", "toward-surface", "upwards", "rise", "ascend", "lift", "buoyancy", "elevate"}
+_DOWN_WORDS = {"downward", "falling", "descending", "down", "downwards", "fall", "descend", "sink", "weight", "gravity"}
 
 # Generic ID prefixes that carry no semantic meaning; skip label derivation for these.
 _GENERIC_ID_RE = re.compile(
@@ -147,13 +148,13 @@ def font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
 
 def color(value: object, fallback: str = MINT) -> str:
     if isinstance(value, str) and len(value) == 7 and value[0] == "#" and all(c in "0123456789abcdefABCDEF" for c in value[1:]):
-        # A controlled palette keeps arbitrary model colors readable and cohesive.
         code = value.upper()
-        if code in ("#FFCA62", "#FFD166"): return GOLD
-        if code in ("#9D8CFF", "#A78BFA"): return "#CAD2F1"
-        if code in ("#55DDE0", "#74E0A5"): return MINT
+        # Direct palette matches
+        if code in ("#E8BE79", "#FFCA62", "#FFD166"): return GOLD
+        if code in ("#B9E5CC", "#55DDE0", "#74E0A5"): return MINT
+        if code in ("#A9DFEA", "#9D8CFF", "#A78BFA", "#CAD2F1", "#C8C1DC", "#E5A69B"): return code
         r, g, b = (int(code[i:i+2], 16) for i in (1, 3, 5))
-        if r > g * 1.22 and r > b * 1.18: return "#E5A69B"
+        if r > g * 1.3 and r > b * 1.25: return "#E5A69B"
         if r > b * 1.3 and g > b * 1.2: return GOLD
         if b > r + 15 and g > r: return "#A9DFEA"
         if b > r * 1.15: return "#C8C1DC"
@@ -195,7 +196,14 @@ def wrap(draw: ImageDraw.ImageDraw, text: str, text_font: ImageFont.FreeTypeFont
 
 
 def clean_text(value: object, limit: int = 180) -> str:
-    text = str(value or "").translate(str.maketrans({"‑": "-", "‐": "-", "−": "-", "–": "-", "—": "-", " ": " ", " ": " "}))
+    text = str(value or "")
+    text = re.sub(r"[\ud800-\udfff]", "", text)
+    text = text.translate(str.maketrans({
+        "‑": "-", "‐": "-", "−": "-", "–": "-", "—": "-",
+        "“": '"', "”": '"', "‘": "'", "’": "'",
+        "…": "...", " ": " ", " ": " ", "•": " ",
+    }))
+    text = "".join(ch for ch in text if ch.isprintable())
     return " ".join(text.split())[:limit]
 
 
@@ -213,52 +221,69 @@ def draw_element(draw: ImageDraw.ImageDraw, e: dict, phase: float) -> None:
     height = round(float(e.get("height", 0)) * 3.74)
     if kind == "circle":
         name = str(e.get("id", "")).lower()
-        orbit = "path" in name or name.endswith("-orbit") or "cycle" in name
-        rx = max(8, round(float(e.get("radius", 5)) * (10.8 if orbit else 3.74)))
+        is_orbit = "path" in name or name.endswith("-orbit") or "cycle" in name or "orbit-path" in name or e.get("fill") in ("none", "transparent")
+        rx = max(8, round(float(e.get("radius", 5)) * (10.8 if is_orbit else 3.74)))
         ry = max(8, round(float(e.get("radius", 5)) * 3.74))
-        if "sun" in name:
-            draw.ellipse((x - rx - 13, y - ry - 13, x + rx + 13, y + ry + 13), outline=GOLD, width=2)
-        draw.ellipse((x - rx, y - ry, x + rx, y + ry), fill=None if orbit else ("#24343D" if editorial else fill), outline=stroke, width=3 if editorial else 5)
-        label = clean_text(e.get("text"), 32)
-        if label and not orbit:
-            if editorial:
-                label_font = font(23, True)
-                lines = wrap(draw, label, label_font, max(90, min(220, 1150-x-rx)), 2)
-                for idx, line in enumerate(lines):
-                    draw.text((x+rx+14, y-(len(lines)*28)/2+idx*28), line, font=label_font, fill=CREAM)
-            else:
-                label_font = font(min(25, max(17, ry // 2)), True)
-                lines = wrap(draw, label, label_font, max(70, rx * 2 - 12), 2)
-                text_fill = BG if e.get("fill") and not _is_dark_color(color(e.get("fill"), PANEL)) else CREAM
-                for idx, line in enumerate(lines):
-                    box = draw.textbbox((0, 0), line, font=label_font)
-                    draw.text((x-(box[2]-box[0])/2,y-(len(lines)*label_font.size)/2+idx*(label_font.size+3)),line,font=label_font,fill=text_fill)
-        if "planet" in name or name == "sun":
-            label = "PLANET" if "planet" in name else "SUN"
-            draw.text((x - rx, y + ry + 12), label, font=font(17, True), fill=MUTED)
+        if is_orbit:
+            steps = 64
+            for step in range(0, steps, 2):
+                t0 = (step / steps) * 2 * math.pi
+                t1 = ((step + 1) / steps) * 2 * math.pi
+                p0 = (x + rx * math.cos(t0), y + ry * math.sin(t0))
+                p1 = (x + rx * math.cos(t1), y + ry * math.sin(t1))
+                draw.line((p0, p1), fill="#3E5863", width=2)
+        else:
+            is_radiant = e.get("style") in ("radiant", "glow") or any(w in name for w in ("sun", "star", "emitter", "source", "core", "nucleus", "light"))
+            if is_radiant:
+                draw.ellipse((x - rx - 14, y - ry - 14, x + rx + 14, y + ry + 14), outline=GOLD, width=2)
+                draw.ellipse((x - rx - 24, y - ry - 24, x + rx + 24, y + ry + 24), outline="#483B25", width=1)
+            draw.ellipse((x - rx, y - ry, x + rx, y + ry), fill="#24343D" if editorial else fill, outline=stroke, width=3 if editorial else 5)
+            label = clean_text(e.get("text"), 36)
+            if label:
+                if editorial or rx < 24:
+                    label_font = font(22, True)
+                    lines = wrap(draw, label, label_font, max(90, min(240, 1150 - x - rx)), 2)
+                    for idx, line in enumerate(lines):
+                        draw.text((x + rx + 12, y - (len(lines) * 26) / 2 + idx * 26), line, font=label_font, fill=CREAM)
+                else:
+                    label_font = font(min(24, max(16, ry // 2)), True)
+                    lines = wrap(draw, label, label_font, max(70, rx * 2 - 12), 2)
+                    text_fill = BG if e.get("fill") and not _is_dark_color(color(e.get("fill"), PANEL)) else CREAM
+                    for idx, line in enumerate(lines):
+                        box = draw.textbbox((0, 0), line, font=label_font)
+                        draw.text((x - (box[2] - box[0]) / 2, y - (len(lines) * label_font.size) / 2 + idx * (label_font.size + 3)), line, font=label_font, fill=text_fill)
     elif kind == "rect":
-        # Enforce generous minimum dimensions so labels are always readable
-        width  = max(110, width)
-        height = max(54,  height)
-        draw.rounded_rectangle((x, y, x + width, y + height), radius=15, fill="#24343D" if editorial else fill, outline=stroke, width=2 if editorial else 4)
-        if editorial:
-            draw.rounded_rectangle((x+8, y+10, x+14, y+height-10), radius=3, fill=stroke)
-        label = clean_text(e.get("text"), 48)
-        if label:
-            label_font = font(min(32, max(20, round(height * 0.32))), True)
-            lines = wrap(draw, label, label_font, max(60, width - 28), 2)
-            line_height = label_font.size + 5
-            label_y = y + max(7, (height - len(lines) * line_height) / 2)
-            if editorial:
-                text_fill = CREAM
-            elif e.get("fill"):
-                text_fill = BG if not _is_dark_color(color(e.get("fill"), PANEL)) else CREAM
-            else:
-                text_fill = CREAM
+        label = clean_text(e.get("text"), 64)
+        is_formula = any(op in label for op in ("=", "Δ", "ρ", "×", "÷", "½", "²", "^", "+", "-", "≈")) or e.get("style") == "formula" or "formula" in str(e.get("id", "")).lower() or "equation" in str(e.get("id", "")).lower()
+        if is_formula:
+            width = max(160, width)
+            height = max(50, height)
+            draw.rounded_rectangle((x, y, x + width, y + height), radius=10, fill="#16232B", outline=GOLD, width=2)
+            draw.rounded_rectangle((x, y, x + 6, y + height), radius=3, fill=GOLD)
+            math_font = font(min(28, max(20, round(height * 0.36))), True)
+            lines = wrap(draw, label, math_font, max(100, width - 24), 2)
+            line_height = math_font.size + 4
+            label_y = y + max(6, (height - len(lines) * line_height) / 2)
             for line in lines:
-                box = draw.textbbox((0, 0), line, font=label_font)
-                draw.text((x + (width - (box[2] - box[0])) / 2, label_y), line, font=label_font, fill=text_fill)
+                box = draw.textbbox((0, 0), line, font=math_font)
+                draw.text((x + (width - (box[2] - box[0])) / 2 + 3, label_y), line, font=math_font, fill=CREAM)
                 label_y += line_height
+        else:
+            width = max(110, width)
+            height = max(54, height)
+            draw.rounded_rectangle((x, y, x + width, y + height), radius=15, fill="#24343D" if editorial else fill, outline=stroke, width=2 if editorial else 4)
+            if editorial:
+                draw.rounded_rectangle((x + 8, y + 10, x + 14, y + height - 10), radius=3, fill=stroke)
+            if label:
+                label_font = font(min(32, max(20, round(height * 0.32))), True)
+                lines = wrap(draw, label, label_font, max(60, width - 28), 2)
+                line_height = label_font.size + 5
+                label_y = y + max(7, (height - len(lines) * line_height) / 2)
+                text_fill = CREAM if editorial or not e.get("fill") or _is_dark_color(color(e.get("fill"), PANEL)) else BG
+                for line in lines:
+                    box = draw.textbbox((0, 0), line, font=label_font)
+                    draw.text((x + (width - (box[2] - box[0])) / 2, label_y), line, font=label_font, fill=text_fill)
+                    label_y += line_height
     elif kind in ("line", "arrow"):
         if kind == "arrow":
             tail_x, tail_y = x - width, y + height
@@ -271,25 +296,50 @@ def draw_element(draw: ImageDraw.ImageDraw, e: dict, phase: float) -> None:
         else:
             end_x, end_y = x + width, y + height
             name = str(e.get("id", "")).lower()
-            if "path" in name or "trajectory" in name or "dotted" in name:
+            if "path" in name or "trajectory" in name or "dotted" in name or "orbit" in name:
                 steps = max(1, int(math.hypot(width, height) / 24))
                 for step in range(0, steps, 2):
                     t0 = step / steps
                     t1 = min(1, (step + 1) / steps)
                     draw.line((x + width * t0, y + height * t0, x + width * t1, y + height * t1), fill=stroke, width=4)
             else:
-                draw.line((x, y, end_x, end_y), fill=stroke, width=6, joint="curve")
+                draw.line((x, y, end_x, end_y), fill=stroke, width=5, joint="curve")
     elif kind == "path":
         points = e.get("points") or []
         if len(points) >= 4 and len(points) % 2 == 0:
             pairs = [(100 + round(float(points[i]) * 10.8), 156 + round(float(points[i + 1]) * 3.74)) for i in range(0, len(points), 2)]
-            draw.line(pairs, fill=stroke, width=5, joint="curve")
+            # Check if this forms a closed shape (e.g. airfoil cross-section, cell membrane, polygon)
+            is_closed = len(pairs) >= 3 and math.hypot(pairs[0][0] - pairs[-1][0], pairs[0][1] - pairs[-1][1]) < 30
+            if is_closed:
+                draw.polygon(pairs, fill="#233540", outline=stroke)
+                draw.line(pairs, fill=stroke, width=4, joint="curve")
+            else:
+                draw.line(pairs, fill=stroke, width=4, joint="curve")
+            label = clean_text(e.get("text"), 36)
+            if label:
+                mid_pt = pairs[len(pairs) // 2]
+                label_font = font(18, True)
+                box = draw.textbbox((0, 0), label, font=label_font)
+                lw = box[2] - box[0]
+                lh = box[3] - box[1]
+                lx, ly = mid_pt[0] - lw // 2, mid_pt[1] - lh - 10
+                draw.rounded_rectangle((lx - 6, ly - 4, lx + lw + 6, ly + lh + 4), radius=6, fill="#15222B", outline=stroke, width=1)
+                draw.text((lx, ly), label, font=label_font, fill=CREAM)
     elif kind == "text":
         label = clean_text(e.get("text"), 80)
         if label:
-            label_font = font(25, True)
-            for idx, line in enumerate(wrap(draw, label, label_font, max(80, min(440, 1190 - x)), 2)):
-                draw.text((x, y + idx * 31), line, font=label_font, fill=CREAM)
+            is_formula = any(op in label for op in ("=", "Δ", "ρ", "×", "÷", "½", "²", "^", "+", "-", "≈"))
+            if is_formula:
+                math_font = font(26, True)
+                box = draw.textbbox((0, 0), label, font=math_font)
+                tw = box[2] - box[0]
+                th = box[3] - box[1]
+                draw.rounded_rectangle((x - 12, y - 8, x + tw + 12, y + th + 8), radius=8, fill="#16232B", outline=GOLD, width=2)
+                draw.text((x, y), label, font=math_font, fill=CREAM)
+            else:
+                label_font = font(24, True)
+                for idx, line in enumerate(wrap(draw, label, label_font, max(80, min(440, 1190 - x)), 2)):
+                    draw.text((x, y + idx * 30), line, font=label_font, fill=CREAM)
 
 
 def fit_elements(elements: list[dict]) -> list[dict]:
@@ -324,29 +374,17 @@ def fit_elements(elements: list[dict]) -> list[dict]:
     top    = min(b[1] for b in bounds)
     bottom = max(b[3] for b in bounds)
 
-    # ── D: Solar-system detection ────────────────────────────────────────────
-    # Detect: all non-text elements are circles, one is much larger (orbit) and
-    # the rest are small planets.  When detected, skip the density rescale.
-    all_circles = all(e.get("type") == "circle" for e in elements if e.get("type") != "text")
-    is_solar_system = False
-    if all_circles:
-        circle_els = [e for e in elements if e.get("type") == "circle"]
-        radii = sorted(float(e.get("radius", 5)) for e in circle_els)
-        if len(radii) >= 2:
-            largest = radii[-1]
-            second  = radii[-2]
-            # Solar system heuristic: largest orbit circle is ≥ 2.5× the next largest
-            is_solar_system = largest >= second * 2.5
-
-    if is_solar_system:
-        # Preserve orbital geometry — just center the diagram, no scaling
+    # If elements already span at least 44% of width or 38% of height, preserve geometry and center
+    span_w = max(12, right - left)
+    span_h = max(12, bottom - top)
+    if span_w >= 44 or span_h >= 38:
         center_x = (left + right) / 2
         center_y = (top + bottom) / 2
         result = []
         for original in elements:
             e = dict(original)
-            e["x"] = max(0, min(94, 50 + (float(e.get("x", 50)) - center_x)))
-            e["y"] = max(0, min(92, 50 + (float(e.get("y", 50)) - center_y)))
+            e["x"] = max(4, min(94, 50 + (float(e.get("x", 50)) - center_x)))
+            e["y"] = max(8, min(92, 50 + (float(e.get("y", 50)) - center_y)))
             if e.get("type") == "path" and e.get("points"):
                 pts = e["points"]
                 e["points"] = [
@@ -440,14 +478,8 @@ def frame(scene: dict, title: str, index: int, total: int, elapsed: float, durat
         d.line((640, 210, 640, 535), fill="#304951", width=2)
     elif composition in ("stack", "vertical"):
         d.line((640, 205, 640, 530), fill="#304951", width=2)
-    elif composition == "flow":
-        d.line((170, 345, 1110, 345), fill="#304951", width=2)
     elements = [dict(e) for e in scene.get("elements") or []] if composition else fit_elements(scene.get("elements") or [])
     elements, auto_flow = (elements, []) if composition else reflow_overlapping_nodes(elements)
-    if composition == "flow":
-        for number, node in enumerate((e for e in elements if e.get("type") in ("rect", "circle")), 1):
-            x, y = element_point(node)
-            d.text((x, y-32), f"{number:02d}", font=font(17, True), fill=MUTED)
     animation = {a.get("targetId"): a for a in scene.get("animations") or []}
     last_animation_ms = max(
         (float(a.get("startMs", 0)) + float(a.get("durationMs", 600)) for a in animation.values()),
@@ -504,14 +536,22 @@ def frame(scene: dict, title: str, index: int, total: int, elapsed: float, durat
             chip_color = color(e.get("color") or e.get("fill"), MINT)
             labels.append((clean_text(e.get("text"), 50), chip_color))
         progress = min(1, max(0, (planned_elapsed - start) / max(0.1, float(a.get("durationMs", 600)) / 1000)))
-        if planned_elapsed < start: progress = 1
-        if a.get("kind") == "move" and orbit_element and "planet" in str(e.get("id", "")):
+        orbital_progress = (elapsed / max(0.1, duration))
+        is_moving = a.get("kind") in ("move", "orbit") or composition == "orbit"
+        if is_moving and orbit_element and e.get("id") != orbit_element.get("id") and e.get("type") == "circle":
             center_x = float(orbit_element["x"])
             center_y = float(orbit_element["y"])
-            radius = float(orbit_element.get("radius", 20))
-            angle = math.atan2(float(e["y"]) - center_y, float(e["x"]) - center_x) + progress * 2 * math.pi
+            radius = float(orbit_element.get("radius", 28))
+            angle = math.atan2(float(original.get("y", 50)) - center_y, float(original.get("x", 50)) - center_x) + orbital_progress * 2 * math.pi
             e["x"] = center_x + radius * math.cos(angle)
-            e["y"] = center_y + radius * math.sin(angle)
+            e["y"] = center_y + (radius * 0.72) * math.sin(angle)
+        elif is_moving and a.get("fromX") is not None and a.get("fromY") is not None:
+            fx = float(a["fromX"])
+            fy = float(a["fromY"])
+            tx = float(original.get("x", 50))
+            ty = float(original.get("y", 50))
+            e["x"] = fx + (tx - fx) * progress
+            e["y"] = fy + (ty - fy) * progress
         elif a.get("kind") == "pulse" and e.get("type") == "circle":
             e["radius"] = float(e.get("radius", 5)) * (1 + 0.08 * math.sin(progress * math.pi))
         elif a.get("kind") == "draw" and e.get("type") == "line" and active:
@@ -603,26 +643,37 @@ def speech(text: str, path: Path, rate: int = 0, length_scale: float = 1.0) -> N
     """Use an installed offline neural or system voice. Never send lesson text to a TTS endpoint."""
     engine = shutil.which("piper")
     model = _find_piper_model()
+    clean = re.sub(r"[\ud800-\udfff]", "", text)
+    clean = clean.encode("ascii", "ignore").decode("ascii")
     if engine and model and Path(model).is_file():
-        subprocess.run(
-            [engine, "--model", model, "--output-file", str(path), "--length-scale", f"{length_scale:.3f}"],
-            input=text, text=True, encoding="utf-8", check=True, capture_output=True,
-        )
-    elif os.name == "nt":
+        try:
+            res = subprocess.run(
+                [engine, "--model", model, "--output-file", str(path), "--length-scale", f"{length_scale:.3f}"],
+                input=clean, text=True, encoding="utf-8", capture_output=True,
+            )
+            if res.returncode == 0 and path.is_file() and path.stat().st_size > 0:
+                return
+            app.logger.warning("Piper exited with code %s: %s (stderr: %s)", res.returncode, res.stdout, res.stderr)
+        except Exception as e:
+            app.logger.warning("Piper invocation failed: %s", e)
+
+    if os.name == "nt":
         script = (
             "Add-Type -AssemblyName System.Speech; "
             "$voice = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
             "$voice.Rate = [int]$env:SIMI_SPEECH_RATE; "
+            "$female = $voice.GetInstalledVoices() | Where-Object { $_.VoiceInfo.Gender -eq 'Female' -and $_.Enabled } | Select-Object -First 1; "
+            "if ($female) { $voice.SelectVoice($female.VoiceInfo.Name) }; "
             "$voice.SetOutputToWaveFile($env:SIMI_SPEECH_FILE); "
             "$voice.Speak($env:SIMI_SPEECH_TEXT); "
             "$voice.Dispose()"
         )
         subprocess.run(
             ["powershell", "-NoProfile", "-Command", script], check=True, capture_output=True,
-            env={**os.environ, "SIMI_SPEECH_FILE": str(path), "SIMI_SPEECH_TEXT": text, "SIMI_SPEECH_RATE": str(rate)},
+            env={**os.environ, "SIMI_SPEECH_FILE": str(path), "SIMI_SPEECH_TEXT": clean, "SIMI_SPEECH_RATE": str(rate)},
         )
     elif shutil.which("espeak-ng"):
-        subprocess.run(["espeak-ng", "-w", str(path), text], check=True, capture_output=True)
+        subprocess.run(["espeak-ng", "-w", str(path), clean], check=True, capture_output=True)
     else:
         raise RuntimeError("No offline speech engine found. Install Piper with SIMI_PIPER_MODEL or espeak-ng.")
 
