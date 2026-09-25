@@ -4,6 +4,7 @@ import fixture from "../../../../fixtures/orbits.json";
 import { config } from "./config";
 import { AppError } from "./errors";
 import { ensureAuthenticatedUser, supabase } from "./supabase";
+import { testDevicePass } from "./testDevicePass";
 
 export async function generateLesson(request: GenerateLessonRequest): Promise<Lesson> {
   if (config.fixtureMode) {
@@ -12,7 +13,11 @@ export async function generateLesson(request: GenerateLessonRequest): Promise<Le
   }
   if (!supabase) throw new AppError("service", "Simi is not configured yet. Add the Supabase public values or enable fixture mode.");
   await ensureAuthenticatedUser();
-  const { data, error } = await supabase.functions.invoke("generate-lesson", { body: request });
+  const devicePass = await testDevicePass();
+  const { data, error } = await supabase.functions.invoke("generate-lesson", {
+    body: request,
+    ...(devicePass ? { headers: { "x-simi-test-device": devicePass } } : {}),
+  });
   if (error) {
     const status = (error as { context?: { status?: number } }).context?.status;
     if (status === 401) throw new AppError("auth", "Your secure session expired. Reopen Simi and try again.", true);

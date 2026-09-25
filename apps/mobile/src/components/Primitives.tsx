@@ -51,11 +51,11 @@ export function ProgressBar({ value }: { value: number }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.ink },
-  title: { color: colors.text, fontSize: 30, lineHeight: 36, fontWeight: "800", letterSpacing: -0.7 },
+  title: { color: colors.text, fontSize: 34, lineHeight: 40, fontWeight: "700", letterSpacing: -1.3 },
   body: { color: colors.text, fontSize: 16, lineHeight: 24 },
   muted: { color: colors.muted },
-  card: { backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, padding: spacing.lg },
-  button: { minHeight: 52, paddingHorizontal: spacing.lg, borderRadius: radii.md, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, borderWidth: 1 },
+  card: { backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border, borderRadius: 22, padding: spacing.lg },
+  button: { minHeight: 56, paddingHorizontal: spacing.lg, borderRadius: radii.md, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, borderWidth: 1 },
   button_primary: { backgroundColor: colors.cyan, borderColor: colors.cyan },
   button_secondary: { backgroundColor: colors.panelRaised, borderColor: colors.border },
   button_quiet: { backgroundColor: "transparent", borderColor: "transparent" },

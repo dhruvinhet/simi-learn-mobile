@@ -10,6 +10,7 @@ export const config = {
   oneSignalAppId: publicSetting(process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID),
   billingMode: process.env.EXPO_PUBLIC_GALAXY_BILLING_MODE ?? "TEST",
   fixtureMode: process.env.EXPO_PUBLIC_USE_FIXTURES === "true",
+  videoWorkerUrl: publicSetting(process.env.EXPO_PUBLIC_VIDEO_WORKER_URL),
 };
 
 export const isSupabaseConfigured = Boolean(config.supabaseUrl && config.supabaseAnonKey);
